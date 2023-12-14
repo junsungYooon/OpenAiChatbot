@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>OHEY</title>
+</head>
+<body>
+    <!-- 파일 업로드 컨테이너 -->
+    <div id="file-container" style="float: left; margin-top: 20px; margin-left: 30px;">
+        <form id="fileForm" enctype="multipart/form-data">
+            <input type="file" id="fileInput" accept=".pdf" onchange="updateFilePath()"><br>
+            <input type="button" value="파일 업로드" onclick="uploadFile()">
+        </form>
+        <div id="filePath" style="margin-top: 10px;"></div>
+    </div>
+    <!-- 채팅창 컨테이너 -->
+    <div id="chat-container" style="max-width: 800px; margin: 20px auto;">
+        <div id="chat-box"></div>
+        <input type="text" id="userInput" placeholder="질문을 입력하세요." onkeydown="if (event.keyCode == 13) askQuestion()">
+        <input type="button" value="질문하기" onclick="askQuestion()" id="askButton">
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script>
+    var isQuestionInProgress = false; // isQuestionInProgress = 답변 중인 상태를 나타내는 함수
+
+    function askQuestion() {
+        if (isQuestionInProgress) {
+            return;
+        }
+
+        var askButton = document.getElementById('askButton');
+        askButton.value = '답변 중...'; {# 답변 중일 때 질문하기 버튼 레이블 변경 #}
+        isQuestionInProgress = true; {# 답변 중 상태 활성화 #}
+
+        var userInput = document.getElementById('userInput').value;
+        appendMessage('user-message', userInput); {# 사용자가 입력한 메시지 #}
+
+        // 사용자가 질문 시 호출. /ask_question 서버로 전송 후 응답을 받음
+        $.ajax({
+            type: 'POST',
+            url: '/ask_question',
+            data: { question: userInput },
+            success: function(response) {
+                appendMessage('bot-message', response.answer);
+            },
+            error: function(error) {
+                console.log(error);
+            },
+            complete: function() {
+                askButton.value = '질문하기';
+                isQuestionInProgress = false;
+            }
+        });
+
+        document.getElementById('userInput').value = '';
+    }
+
+    // 메시지를 화면에 추가
+    function appendMessage(className, message) {
+        var chatBox = document.getElementById('chat-box');
+        var messageElement = document.createElement('div');
+        messageElement.className = className;
+        messageElement.innerText = message;
+        chatBox.appendChild(messageElement);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function uploadFile() {
+        var fileInput = document.getElementById('fileInput');
+        var formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        // 파일을 업로드. 선택된 파일을 /process_file 서버로 전송하고 응답을 받음
+        $.ajax({
+            type: 'POST',
+            url: '/process_file',
+            data: formData,
+            contentType: false,
+            cache: false,
+            processData: false,
+            success: function(response) {
+                alert(response.message);
+                updateFileList();
+                $('#uploadedFiles').show();
+                document.getElementById('filePath').innerText = fileInput.files[0].name;
+            },
+            error: function(error) {
+                console.log(error);
+            }
+        });
+    }
+
+    // /get_uploaded_files 서버에서 업로드된 파일 목록을 받아와 화면에 표시
+    function updateFileList() {
+        $.ajax({
+            type: 'GET',
+            url: '/get_uploaded_files',
+            success: function(response) {
+                var fileList = document.getElementById('fileList');
+                fileList.innerHTML = '';
+
+                response.files.forEach(function(file) {
+                    var listItem = document.createElement('li');
+                    listItem.innerText = file;
+                    fileList.appendChild(listItem);
+                });
+            },
+            error: function(error) {
+                console.log(error);
+            }
+        });
+    }
+
+    // 파일 경로 업데이트
+    function updateFilePath() {
+        var fileInput = document.getElementById('fileInput');
+        document.getElementById('filePath').innerText = fileInput.files[0].name;
+    }
+    </script>
+</body>
+</html>
